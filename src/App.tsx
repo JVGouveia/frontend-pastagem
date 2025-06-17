@@ -1,10 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './components/Login';
-import { AdminDashboard } from './components/AdminDashboard';
+import AdminDashboard from './components/AdminDashboard';
 import { ProdutorDashboard } from './components/ProdutorDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Cargo } from './contexts/AuthContext';
-import './App.css'
 
 function AppRoutes() {
   const { user } = useAuth();

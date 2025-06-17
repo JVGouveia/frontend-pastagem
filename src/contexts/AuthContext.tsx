@@ -7,9 +7,12 @@ export enum Cargo {
 }
 
 interface User {
+  id: number;
   nome: string;
   email: string;
   cargo: Cargo;
+  sub?: string;  // ID do Cognito
+  cognitoId?: string;  // ID alternativo do Cognito
 }
 
 interface AuthContextType {

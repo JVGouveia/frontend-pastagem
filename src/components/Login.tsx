@@ -1,98 +1,164 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Box, Typography, TextField, Button, Paper, Alert, CircularProgress } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import api from '../config/axios';
 import { useAuth } from '../contexts/AuthContext';
 import type { Cargo } from '../contexts/AuthContext';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: 'hsl(217, 72%, 46%)',
+    },
+    background: {
+      default: '#f8fafc',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#1f2937',
+      secondary: '#6b7280',
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        },
+      },
+    },
+  },
+});
 
 export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Iniciando tentativa de login...');
+    setLoading(true);
+    setError('');
+    
     try {
-      console.log('Enviando requisição para o backend...');
       const response = await api.post('/auth/login', {
         username,
         password
       });
 
-      console.log('Resposta do backend:', response.data);
-
       if (response.data) {
-        console.log('Login bem sucedido, armazenando tokens...');
-        const { idToken, refreshToken, cargo, nome, email } = response.data;
-        login(idToken, refreshToken, { nome, email, cargo: cargo as Cargo });
-        console.log('Tokens armazenados, redirecionando para dashboard...');
+        const { idToken, refreshToken, cargo, nome, email, cognitoId, id } = response.data;
+        login(idToken, refreshToken, { id, nome, email, cargo: cargo as Cargo, sub: cognitoId });
         navigate('/');
       }
     } catch (err: any) {
       console.error('Erro detalhado:', err);
-      console.error('Resposta do erro:', err.response?.data);
-      setError('Erro ao fazer login. Verifique suas credenciais.');
+      if (err.message) {
+        setError(err.message);
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Erro ao fazer login. Verifique suas credenciais e tente novamente.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <ThemeProvider theme={theme}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default',
+          py: 12,
+          px: 4,
+        }}
+      >
+        <Paper
+          elevation={1}
+          sx={{
+            maxWidth: 400,
+            width: '100%',
+            p: 4,
+            borderRadius: '8px',
+          }}
+        >
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              textAlign: 'center',
+              fontWeight: 'bold',
+              color: 'text.primary',
+              mb: 3,
+            }}
+          >
             Login
-          </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="username" className="sr-only">
-                Usuário
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Usuário"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Senha
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
+          </Typography>
 
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Usuário"
+              variant="outlined"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              sx={{ mb: 2 }}
+            />
 
-          <div>
-            <button
+            <TextField
+              fullWidth
+              label="Senha"
+              type="password"
+              variant="outlined"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              sx={{ mb: 3 }}
+            />
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              fullWidth
+              variant="contained"
+              size="large"
+              disabled={loading}
+              sx={{
+                py: 1.5,
+                fontSize: '1rem',
+              }}
             >
-              Entrar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                'Entrar'
+              )}
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
+    </ThemeProvider>
   );
 } 

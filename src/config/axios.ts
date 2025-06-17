@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: '/api', // Usando o proxy do Vite
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true // Habilitando credenciais para CORS
 });
 
 // Interceptor para adicionar o token em todas as requisições
@@ -20,6 +21,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Verifica se o erro tem uma resposta
+    if (!error.response) {
+      console.error('Erro de rede ou bloqueio:', error);
+      return Promise.reject(new Error('Erro de conexão com o servidor. Verifique sua conexão ou se o servidor está rodando.'));
+    }
+
     const originalRequest = error.config;
 
     // Se o erro for 401 e não for uma tentativa de refresh
@@ -31,7 +38,7 @@ api.interceptors.response.use(
         const username = localStorage.getItem('username');
 
         if (refreshToken && username) {
-          const response = await axios.post('http://localhost:8080/auth/refresh', {
+          const response = await axios.post('/api/auth/refresh', {
             refreshToken,
             username,
           });

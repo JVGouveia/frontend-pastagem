@@ -1,36 +1,65 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../config/axios';
+import { Box, Typography, Button, Paper, Grid, Table, TableContainer, TableHead, TableRow, TableCell, TableBody, TextField, Select, MenuItem, Modal, Fade, Backdrop, CircularProgress, Alert, IconButton } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
+import type { SxProps } from '@mui/system';
+import { People as UsersIcon, PersonAdd as UserPlusIcon, Settings as SettingsIcon, Logout as LogOutIcon, Visibility as EyeIcon, Edit as EditIcon, Delete as Trash2Icon, Save as SaveIcon, Close as XIcon, BarChart as BarChart3Icon, TrendingUp as TrendingUpIcon, Lock as LockIcon } from '@mui/icons-material';
+import { usuarioService } from '../services/api';
+import type { Usuario, NovoUsuario } from '../services/api';
+import type { SelectChangeEvent } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
-import { Cargo } from '../contexts/AuthContext';
-import { Users, UserPlus, Settings, LogOut, Eye, Edit, Trash2, Save, X } from 'lucide-react';
 
-interface Usuario {
-  id: number;
-  nome: string;
-  email: string;
-  cpf: string;
-  telefone: string;
-  cargo: Cargo;
-  createdAt: string;
-}
+// Funções de formatação
+const formatarCPF = (cpf: string) => {
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  if (cpfLimpo.length <= 3) return cpfLimpo;
+  if (cpfLimpo.length <= 6) return `${cpfLimpo.slice(0, 3)}.${cpfLimpo.slice(3)}`;
+  if (cpfLimpo.length <= 9) return `${cpfLimpo.slice(0, 3)}.${cpfLimpo.slice(3, 6)}.${cpfLimpo.slice(6)}`;
+  return `${cpfLimpo.slice(0, 3)}.${cpfLimpo.slice(3, 6)}.${cpfLimpo.slice(6, 9)}-${cpfLimpo.slice(9, 11)}`;
+};
 
-export function AdminDashboard() {
+const formatarTelefone = (telefone: string) => {
+  const telefoneLimpo = telefone.replace(/\D/g, '');
+  if (telefoneLimpo.length <= 2) return telefoneLimpo;
+  if (telefoneLimpo.length <= 6) return `(${telefoneLimpo.slice(0, 2)}) ${telefoneLimpo.slice(2)}`;
+  if (telefoneLimpo.length <= 10) return `(${telefoneLimpo.slice(0, 2)}) ${telefoneLimpo.slice(2, 6)}-${telefoneLimpo.slice(6)}`;
+  return `(${telefoneLimpo.slice(0, 2)}) ${telefoneLimpo.slice(2, 7)}-${telefoneLimpo.slice(7, 11)}`;
+};
+
+const validarSenha = (senha: string) => {
+  if (senha.length < 8) return 'A senha deve ter pelo menos 8 caracteres';
+  if (!/[A-Z]/.test(senha)) return 'A senha deve conter pelo menos uma letra maiúscula';
+  if (!/[a-z]/.test(senha)) return 'A senha deve conter pelo menos uma letra minúscula';
+  if (!/[0-9]/.test(senha)) return 'A senha deve conter pelo menos um número';
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) return 'A senha deve conter pelo menos um caractere especial';
+  return '';
+};
+
+export default function AdminDashboard() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [novoUsuario, setNovoUsuario] = useState({
+  const [novoUsuario, setNovoUsuario] = useState<NovoUsuario>({
     nome: '',
     email: '',
     cpf: '',
     telefone: '',
-    cargo: Cargo.PRODUTOR,
+    cargo: 'PRODUTOR',
     senha: ''
   });
   const [activeView, setActiveView] = useState('dashboard');
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<Usuario | null>(null);
-
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [changePasswordData, setChangePasswordData] = useState({
+    senhaAtual: '',
+    novaSenha: '',
+    confirmarSenha: ''
+  });
+  const [senhaError, setSenhaError] = useState('');
   const navigate = useNavigate();
   const { logout, user } = useAuth();
 
@@ -40,16 +69,13 @@ export function AdminDashboard() {
 
   const carregarUsuarios = async () => {
     try {
-      const response = await api.get('/usuario');
-      const usuariosComCreatedAt = response.data.map((u: Usuario) => ({
-        ...u,
-        createdAt: u.createdAt || new Date().toISOString().split('T')[0]
-      }));
-      setUsuarios(usuariosComCreatedAt);
-      setLoading(false);
+      setLoading(true);
+      const data = await usuarioService.listarTodos();
+      setUsuarios(data);
     } catch (err) {
       setError('Erro ao carregar usuários');
       console.error(err);
+    } finally {
       setLoading(false);
     }
   };
@@ -59,41 +85,82 @@ export function AdminDashboard() {
     navigate('/login');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (!novoUsuario.nome.trim() || 
+        !novoUsuario.email.trim() || 
+        !novoUsuario.cpf.trim() || 
+        !novoUsuario.telefone.trim() || 
+        !novoUsuario.senha.trim()) {
+      alert('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    // Validação de CPF (apenas números)
+    const cpfLimpo = novoUsuario.cpf.replace(/\D/g, '');
+    if (!/^\d{11}$/.test(cpfLimpo)) {
+      alert('CPF inválido. Digite apenas números.');
+      return;
+    }
+
+    // Validação de email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novoUsuario.email)) {
+      alert('Email inválido');
+      return;
+    }
+
+    // Validação de telefone (apenas números)
+    const telefoneLimpo = novoUsuario.telefone.replace(/\D/g, '');
+    if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+      alert('Telefone inválido. Digite apenas números.');
+      return;
+    }
+    
     try {
-      await api.post('/usuario', novoUsuario);
+      setLoadingAction('create');
+      // Enviar dados limpos para a API
+      const usuarioParaCriar = {
+        ...novoUsuario,
+        cpf: cpfLimpo,
+        telefone: telefoneLimpo
+      };
+      const usuarioCriado = await usuarioService.criar(usuarioParaCriar);
+      setUsuarios([...usuarios, usuarioCriado]);
       setShowModal(false);
-      carregarUsuarios();
       setNovoUsuario({
         nome: '',
         email: '',
         cpf: '',
         telefone: '',
-        cargo: Cargo.PRODUTOR,
+        cargo: 'PRODUTOR',
         senha: ''
       });
     } catch (err) {
       setError('Erro ao criar usuário');
       console.error(err);
+    } finally {
+      setLoadingAction(null);
     }
   };
 
   const handleEditUser = (user: Usuario) => {
-    setEditingUser({ ...user });
+    setEditingUser(user);
+    setShowEditModal(true);
   };
 
   const handleSaveEdit = async () => {
     if (editingUser) {
       try {
-        await api.put(`/usuario/${editingUser.id}`, editingUser);
+        setLoadingAction(`edit-${editingUser.id}`);
+        const usuarioAtualizado = await usuarioService.atualizar(editingUser.id, editingUser);
         setUsuarios(usuarios.map(u =>
-          u.id === editingUser.id ? editingUser : u
+          u.id === editingUser.id ? usuarioAtualizado : u
         ));
         setEditingUser(null);
       } catch (err) {
-        setError('Erro ao salvar edição do usuário');
+        setError('Erro ao atualizar usuário');
         console.error(err);
+      } finally {
+        setLoadingAction(null);
       }
     }
   };
@@ -101,386 +168,894 @@ export function AdminDashboard() {
   const handleDeleteUser = async (id: number) => {
     if (window.confirm('Tem certeza que deseja deletar este usuário?')) {
       try {
-        await api.delete(`/usuario/${id}`);
+        setLoadingAction(`delete-${id}`);
+        await usuarioService.deletar(id);
         setUsuarios(usuarios.filter(u => u.id !== id));
       } catch (err) {
         setError('Erro ao deletar usuário');
         console.error(err);
+      } finally {
+        setLoadingAction(null);
       }
     }
   };
 
   const totalUsers = usuarios.length;
-  const adminCount = usuarios.filter(u => u.cargo === Cargo.ADMIN).length;
-  const producerCount = usuarios.filter(u => u.cargo === Cargo.PRODUTOR).length;
+  const adminCount = usuarios.filter(u => u.cargo === 'ADMIN').length;
+  const producerCount = usuarios.filter(u => u.cargo === 'PRODUTOR').length;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Carregando...</div>
-      </div>
-    );
-  }
+  const theme = createTheme({
+    palette: {
+      primary: {
+        main: 'hsl(217, 72%, 46%)', // Azul principal para botões, seleção
+      },
+      secondary: {
+        main: '#9333ea', // Roxo para Produtor
+        light: '#ede9fe',
+        dark: '#7e22ce',
+      },
+      info: {
+        main: '#3b82f6', // Azul para Total de Usuários
+        light: '#dbeafe',
+        dark: '#2563eb',
+      },
+      success: {
+        main: '#22c55e', // Verde para Admin
+        light: '#dcfce7',
+        dark: '#16a34a',
+      },
+      error: {
+        main: '#ef4444', // Vermelho para erro/sair
+      },
+      background: {
+        default: '#f8fafc', // Fundo principal da dashboard (gray-100)
+        paper: '#ffffff', // Fundo de cards e modais
+      },
+      text: {
+        primary: '#1f2937', // gray-800
+        secondary: '#6b7280', // gray-500
+      },
+    },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none',
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)', // shadow
+          },
+        },
+      },
+      MuiTableCell: {
+        styleOverrides: {
+          head: {
+            textTransform: 'uppercase',
+            fontWeight: 'medium',
+            color: 'hsl(210, 4%, 45%)', // gray-500
+          },
+        },
+      },
+    },
+  });
 
   const Sidebar = () => (
-    <div className="bg-slate-800 text-white w-64 min-h-screen p-4 flex flex-col">
-      <div className="mb-8">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <Users className="w-6 h-6" />
-          Dashboard Usuários
-        </h1>
-      </div>
+    <Box sx={{
+      width: 256,
+      p: 2,
+      bgcolor: 'hsl(217, 28%, 15%)',
+      color: 'white',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <UsersIcon sx={{ width: 24, height: 24 }} />
+          <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold' }}>Dashboard Usuários</Typography>
+        </Box>
+        {user && (
+          <Box sx={{ fontSize: 12, color: 'text.secondary' }}>
+            <Typography variant="body2">Logado como:</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{user.nome}</Typography>
+            <Typography variant="body2" sx={{ color: 'info.main' }}>{user.cargo}</Typography>
+          </Box>
+        )}
+      </Box>
 
-      <nav className="space-y-2 flex-grow">
-        <button
+      <Box component="nav" sx={{ flexGrow: 1, '& > button': { width: '100%', display: 'flex', alignItems: 'center', gap: 1, p: 1.5, borderRadius: '8px', transition: 'background-color 0.3s' } }}>
+        <Button
           onClick={() => setActiveView('dashboard')}
-          className={`w-full flex items-center gap-2 p-3 rounded-lg transition-colors ${
-            activeView === 'dashboard' ? 'bg-blue-600' : 'hover:bg-slate-700'
-          }`}
-        >
-          <Users className="w-5 h-5" />
-          Dashboard
-        </button>
-
-        <button
-          onClick={() => setActiveView('manage')}
-          className={`w-full flex items-center gap-2 p-3 rounded-lg transition-colors ${
-            activeView === 'manage' ? 'bg-blue-600' : 'hover:bg-slate-700'
-          }`}
-        >
-          <Settings className="w-5 h-5" />
-          Gerenciar Usuários
-        </button>
-
-        <button
-          onClick={() => {
-            setShowModal(true);
-            setNovoUsuario({ nome: '', email: '', cpf: '', telefone: '', cargo: Cargo.PRODUTOR, senha: '' });
+          sx={{
+            justifyContent: 'flex-start',
+            ...(activeView === 'dashboard' && { bgcolor: 'primary.main', color: 'white' }),
+            ...(! (activeView === 'dashboard') && { color: 'text.secondary', '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' } }),
           }}
-          className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-700 transition-colors"
         >
-          <UserPlus className="w-5 h-5" />
-          Criar Usuário
-        </button>
-      </nav>
+          <BarChart3Icon sx={{ width: 20, height: 20 }} />
+          Dashboard
+        </Button>
 
-      <div className="mt-auto">
-        <button onClick={handleLogout} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-700 transition-colors text-red-400">
-          <LogOut className="w-5 h-5" />
-          Sair
-        </button>
-      </div>
-    </div>
+        <Button
+          onClick={() => setActiveView('manage')}
+          sx={{
+            justifyContent: 'flex-start',
+            ...(activeView === 'manage' && { bgcolor: 'primary.main', color: 'white' }),
+            ...(! (activeView === 'manage') && { color: 'text.secondary', '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' } }),
+          }}
+        >
+          <SettingsIcon sx={{ width: 20, height: 20 }} />
+          Gerenciar Usuários
+        </Button>
+
+        <Button
+          onClick={() => setShowModal(true)}
+          sx={{
+            justifyContent: 'flex-start',
+            color: 'text.secondary',
+            '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+          }}
+        >
+          <UserPlusIcon sx={{ width: 20, height: 20 }} />
+          Criar Usuário
+        </Button>
+      </Box>
+
+      <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid hsl(217, 28%, 25%)' }}>
+            <Button
+              onClick={() => setShowChangePasswordModal(true)}
+              sx={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                p: 1.5,
+                borderRadius: '8px',
+                justifyContent: 'flex-start',
+                color: 'text.secondary',
+                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+              }}
+            >
+              <LockIcon sx={{ width: 20, height: 20 }} />
+              Alterar Senha
+            </Button>
+
+            <Button
+              onClick={handleLogout}
+              sx={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                p: 1.5,
+                borderRadius: '8px',
+                justifyContent: 'flex-start',
+                color: 'error.main',
+                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+              }}
+            >
+              <LogOutIcon sx={{ width: 20, height: 20 }} />
+              Sair
+            </Button>
+          </Box>
+        </Box>
   );
 
   const DashboardView = () => (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h2 className="text-3xl font-bold mb-8 text-gray-800">Dashboard de Usuários</h2>
+    <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
+      <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 2 }}>Dashboard de Usuários</Typography>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500 transform transition-transform duration-300 hover:scale-105">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Total de Usuários</p>
-              <p className="text-4xl font-extrabold text-gray-800 mt-2">{totalUsers}</p>
-            </div>
-            <Users className="w-12 h-12 text-blue-500 opacity-20" />
-          </div>
-        </div>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'info.main' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="body2" color="text.secondary">Total de Usuários</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{totalUsers}</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, bgcolor: 'info.light', borderRadius: '50%' }}>
+                <UsersIcon sx={{ width: 32, height: 32, color: 'info.dark' }} />
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500 transform transition-transform duration-300 hover:scale-105">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Administradores</p>
-              <p className="text-4xl font-extrabold text-gray-800 mt-2">{adminCount}</p>
-            </div>
-            <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-green-600 font-bold text-2xl">
-              A
-            </div>
-          </div>
-        </div>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'success.main' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="body2" color="text.secondary">Administradores</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{adminCount}</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, bgcolor: 'success.light', borderRadius: '50%' }}>
+                <Box sx={{ width: 32, height: 32, bgcolor: 'success.main', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Typography variant="body1" sx={{ color: 'white', fontWeight: 'bold' }}>A</Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500 transform transition-transform duration-300 hover:scale-105">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Produtores</p>
-              <p className="text-4xl font-extrabold text-gray-800 mt-2">{producerCount}</p>
-            </div>
-            <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 font-bold text-2xl">
-              P
-            </div>
-          </div>
-        </div>
-      </div>
+        <Grid item xs={12} md={4}>
+          <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'secondary.main' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="body2" color="text.secondary">Produtores</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{producerCount}</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, bgcolor: 'secondary.light', borderRadius: '50%' }}>
+                <Box sx={{ width: 32, height: 32, bgcolor: 'secondary.main', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Typography variant="body1" sx={{ color: 'white', fontWeight: 'bold' }}>P</Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm">
-        <h3 className="text-2xl font-bold mb-6 text-gray-800">Distribuição por Cargo</h3>
-        <div className="flex flex-wrap md:flex-nowrap gap-6 justify-center">
-          <div className="flex-1 min-w-[280px] max-w-md bg-green-50 p-6 rounded-lg text-center shadow-sm border border-green-200">
-            <p className="text-green-600 text-lg mb-2">ADMIN</p>
-            <p className="text-3xl font-bold text-green-800">{adminCount}</p>
-            <p className="text-sm text-gray-600 mt-2">{totalUsers > 0 ? ((adminCount/totalUsers)*100).toFixed(1) : 0}%</p>
-          </div>
-          <div className="flex-1 min-w-[280px] max-w-md bg-purple-50 p-6 rounded-lg text-center shadow-sm border border-purple-200">
-            <p className="text-purple-600 text-lg mb-2">PRODUTOR</p>
-            <p className="text-3xl font-bold text-purple-800">{producerCount}</p>
-            <p className="text-sm text-gray-600 mt-2">{totalUsers > 0 ? ((producerCount/totalUsers)*100).toFixed(1) : 0}%</p>
-          </div>
-        </div>
-      </div>
-    </div>
+      <Paper elevation={1} sx={{ p: 3, borderRadius: '8px' }}>
+        <Typography variant="h6" component="h3" sx={{ fontWeight: 'semibold', mb: 2 }}>Distribuição por Cargo</Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 2, borderRadius: '8px', textAlign: 'center', bgcolor: 'success.light', border: '1px solid', borderColor: 'success.main' }}>
+              <Typography variant="subtitle1" sx={{ color: 'success.dark', fontWeight: 'semibold', mb: 0.5 }}>ADMIN</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.dark', mb: 0.5 }}>{adminCount}</Typography>
+              <Typography variant="body2" sx={{ color: 'success.main' }}>
+                {totalUsers > 0 ? ((adminCount / totalUsers) * 100).toFixed(1) : 0}%
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 2, borderRadius: '8px', textAlign: 'center', bgcolor: 'secondary.light', border: '1px solid', borderColor: 'secondary.main' }}>
+              <Typography variant="subtitle1" sx={{ color: 'secondary.dark', fontWeight: 'semibold', mb: 0.5 }}>PRODUTOR</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'secondary.dark', mb: 0.5 }}>{producerCount}</Typography>
+              <Typography variant="body2" sx={{ color: 'secondary.main' }}>
+                {totalUsers > 0 ? ((producerCount / totalUsers) * 100).toFixed(1) : 0}%
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Paper>
+    </Box>
   );
 
   const ManageView = () => (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Gerenciar Usuários</h2>
+    <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
+      <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 2 }}>Gerenciar Usuários</Typography>
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Criação</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {usuarios.map((usuario) => (
-              <tr key={usuario.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {editingUser && editingUser.id === usuario.id ? (
-                    <input
-                      type="text"
-                      value={editingUser.nome}
-                      onChange={(e) => setEditingUser({...editingUser, nome: e.target.value})}
-                      className="border rounded px-2 py-1"
-                    />
-                  ) : (
-                    usuario.nome
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {editingUser && editingUser.id === usuario.id ? (
-                    <input
-                      type="email"
-                      value={editingUser.email}
-                      onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
-                      className="border rounded px-2 py-1"
-                    />
-                  ) : (
-                    usuario.email
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {editingUser && editingUser.id === usuario.id ? (
-                    <input
-                      type="text"
-                      value={editingUser.cpf}
-                      onChange={(e) => setEditingUser({...editingUser, cpf: e.target.value})}
-                      className="border rounded px-2 py-1"
-                    />
-                  ) : (
-                    usuario.cpf
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {editingUser && editingUser.id === usuario.id ? (
-                    <input
-                      type="text"
-                      value={editingUser.telefone}
-                      onChange={(e) => setEditingUser({...editingUser, telefone: e.target.value})}
-                      className="border rounded px-2 py-1"
-                    />
-                  ) : (
-                    usuario.telefone
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {editingUser && editingUser.id === usuario.id ? (
-                    <select
-                      value={editingUser.cargo}
-                      onChange={(e) => setEditingUser({...editingUser, cargo: e.target.value as Cargo})}
-                      className="border rounded px-2 py-1"
-                    >
-                      <option value={Cargo.ADMIN}>ADMIN</option>
-                      <option value={Cargo.PRODUTOR}>PRODUTOR</option>
-                    </select>
-                  ) : (
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      usuario.cargo === Cargo.ADMIN ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'
-                    }`}>
-                      {usuario.cargo}
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(usuario.createdAt).toLocaleDateString('pt-BR')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {editingUser && editingUser.id === usuario.id ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleSaveEdit}
-                        className="text-green-600 hover:text-green-900"
+      <Paper elevation={1} sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: 'action.hover' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'medium', color: 'text.secondary', textTransform: 'uppercase' }}>Nome</TableCell>
+                <TableCell sx={{ fontWeight: 'medium', color: 'text.secondary', textTransform: 'uppercase' }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 'medium', color: 'text.secondary', textTransform: 'uppercase' }}>Cargo</TableCell>
+                <TableCell sx={{ fontWeight: 'medium', color: 'text.secondary', textTransform: 'uppercase' }}>Data Criação</TableCell>
+                <TableCell sx={{ fontWeight: 'medium', color: 'text.secondary', textTransform: 'uppercase' }}>Ações</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ textAlign: 'center' }}>
+                    <CircularProgress size={24} sx={{ color: 'info.main', mr: 1 }} />
+                    <Typography variant="body2" color="text.secondary">Carregando usuários...</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : usuarios.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ textAlign: 'center', color: 'text.secondary' }}>
+                    Nenhum usuário encontrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                usuarios.map((usuario) => (
+                  <TableRow key={usuario.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'text.primary' }}>{usuario.nome}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">{usuario.email}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box
+                        component="span"
+                        sx={{
+                          px: 1,
+                          py: 0.5,
+                          display: 'inline-flex',
+                          fontSize: 12,
+                          fontWeight: 'semibold',
+                          borderRadius: '9999px',
+                          bgcolor: usuario.cargo === 'ADMIN' ? 'success.light' : 'secondary.light',
+                          color: usuario.cargo === 'ADMIN' ? 'success.dark' : 'secondary.dark',
+                        }}
                       >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setEditingUser(null)}
-                        className="text-gray-600 hover:text-gray-900"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditUser(usuario)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(usuario.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                        {usuario.cargo}
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>
+                      {new Date(usuario.createdAt).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <IconButton
+                          onClick={() => handleEditUser(usuario)}
+                          disabled={loadingAction === `delete-${usuario.id}`}
+                          color="info"
+                        >
+                          <EditIcon sx={{ width: 16, height: 16 }} />
+                        </IconButton>
+                        <IconButton
+                          onClick={() => handleDeleteUser(usuario.id)}
+                          disabled={loadingAction === `delete-${usuario.id}`}
+                          color="error"
+                        >
+                          {loadingAction === `delete-${usuario.id}` ? (
+                            <CircularProgress size={16} color="error" />
+                          ) : (
+                            <Trash2Icon sx={{ width: 16, height: 16 }} />
+                          )}
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Box>
   );
 
-  const CreateUserModal = () => (
-    showModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-          <h3 className="text-2xl font-bold mb-5 text-gray-800">Criar Novo Usuário</h3>
+  const CreateUserModal = memo(() => {
+    const [formData, setFormData] = useState<NovoUsuario>({
+      nome: '',
+      email: '',
+      cpf: '',
+      telefone: '',
+      cargo: 'PRODUTOR',
+      senha: ''
+    });
 
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-                <input
-                  type="text"
-                  value={novoUsuario.nome}
-                  onChange={(e) => setNovoUsuario({...novoUsuario, nome: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite o nome"
-                  required
-                />
-              </div>
+    const [senhaError, setSenhaError] = useState('');
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={novoUsuario.email}
-                  onChange={(e) => setNovoUsuario({...novoUsuario, email: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite o email"
-                  required
-                />
-              </div>
+    const handleClose = useCallback(() => {
+      setShowModal(false);
+      setFormData({
+        nome: '',
+        email: '',
+        cpf: '',
+        telefone: '',
+        cargo: 'PRODUTOR',
+        senha: ''
+      });
+      setSenhaError('');
+    }, []);
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
-                <input
-                  type="text"
-                  value={novoUsuario.cpf}
-                  onChange={(e) => setNovoUsuario({...novoUsuario, cpf: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite o CPF"
-                  required
-                />
-              </div>
+    const handleInputChange = useCallback((field: keyof NovoUsuario, value: string) => {
+      setFormData(prev => ({ ...prev, [field]: value }));
+      if (field === 'senha') {
+        setSenhaError(validarSenha(value));
+      }
+    }, []);
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                <input
-                  type="text"
-                  value={novoUsuario.telefone}
-                  onChange={(e) => setNovoUsuario({...novoUsuario, telefone: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite o telefone"
-                  required
-                />
-              </div>
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      const senhaValidationError = validarSenha(formData.senha);
+      if (senhaValidationError) {
+        setSenhaError(senhaValidationError);
+        return;
+      }
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
-                <select
-                  value={novoUsuario.cargo}
-                  onChange={(e) => setNovoUsuario({...novoUsuario, cargo: e.target.value as Cargo})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={Cargo.PRODUTOR}>PRODUTOR</option>
-                  <option value={Cargo.ADMIN}>ADMIN</option>
-                </select>
-              </div>
+      try {
+        setLoadingAction('create');
+        const usuarioParaCriar = {
+          ...formData,
+          cpf: formData.cpf.replace(/\D/g, ''),
+          telefone: formData.telefone.replace(/\D/g, ''),
+        };
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                <input
-                  type="password"
-                  value={novoUsuario.senha}
-                  onChange={(e) => setNovoUsuario({...novoUsuario, senha: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite a senha"
-                  required
-                />
-              </div>
-            </div>
+        const usuarioCriado = await usuarioService.criar(usuarioParaCriar);
+        setUsuarios(prev => [...prev, usuarioCriado]);
+        handleClose();
+      } catch (err: any) {
+        console.error('Erro ao criar usuário:', err);
+        if (err.response?.data?.error) {
+          setError(err.response.data.error);
+        } else {
+          setError('Erro ao criar usuário. Verifique se todos os campos estão preenchidos corretamente.');
+        }
+      } finally {
+        setLoadingAction(null);
+      }
+    }, [formData, handleClose]);
 
-            <div className="flex gap-3 mt-6">
-              <button
-                type="submit"
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Criar Usuário
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowModal(false);
-                  setNovoUsuario({ nome: '', email: '', cpf: '', telefone: '', cargo: Cargo.PRODUTOR, senha: '' });
+    return (
+      <Modal
+        aria-labelledby="transition-modal-title-usuario"
+        aria-describedby="transition-modal-description-usuario"
+        open={showModal}
+        onClose={handleClose}
+        closeAfterTransition
+        slots={{ backdrop: Backdrop }}
+        slotProps={{
+          backdrop: {
+            timeout: 500,
+          },
+        }}
+      >
+        <Fade in={showModal}>
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            border: '2px solid #000',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: '8px',
+          }}>
+            <Typography id="transition-modal-title-usuario" variant="h6" component="h2" sx={{ mb: 2 }}>
+              Criar Novo Usuário
+            </Typography>
+            <form onSubmit={handleSubmit}>
+              <TextField
+                label="Nome"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.nome}
+                onChange={(e) => handleInputChange('nome', e.target.value)}
+                required
+                disabled={loadingAction === 'create'}
+              />
+              <TextField
+                label="Email"
+                variant="outlined"
+                fullWidth
+                type="email"
+                sx={{ mb: 2 }}
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                required
+                disabled={loadingAction === 'create'}
+              />
+              <TextField
+                label="CPF"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.cpf}
+                onChange={(e) => {
+                  const cpfFormatado = formatarCPF(e.target.value);
+                  handleInputChange('cpf', cpfFormatado);
                 }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
+                required
+                disabled={loadingAction === 'create'}
+                inputProps={{ maxLength: 14 }}
+              />
+              <TextField
+                label="Telefone"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.telefone}
+                onChange={(e) => {
+                  const telefoneFormatado = formatarTelefone(e.target.value);
+                  handleInputChange('telefone', telefoneFormatado);
+                }}
+                required
+                disabled={loadingAction === 'create'}
+                inputProps={{ maxLength: 15 }}
+              />
+              <TextField
+                label="Senha"
+                variant="outlined"
+                fullWidth
+                type="password"
+                sx={{ mb: 1 }}
+                value={formData.senha}
+                onChange={(e) => handleInputChange('senha', e.target.value)}
+                required
+                disabled={loadingAction === 'create'}
+                error={!!senhaError}
+                helperText={senhaError || 'Mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial'}
+              />
+              <Select
+                label="Cargo"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.cargo}
+                onChange={(e: SelectChangeEvent<"ADMIN" | "PRODUTOR">) => handleInputChange('cargo', e.target.value as 'ADMIN' | 'PRODUTOR')}
+                required
+                disabled={loadingAction === 'create'}
               >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )
-  );
+                <MenuItem value="PRODUTOR">PRODUTOR</MenuItem>
+                <MenuItem value="ADMIN">ADMIN</MenuItem>
+              </Select>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Button
+                  onClick={handleClose}
+                  variant="outlined"
+                  disabled={loadingAction === 'create'}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={loadingAction === 'create' || !!senhaError}
+                >
+                  {loadingAction === 'create' ? <CircularProgress size={24} /> : 'Salvar'}
+                </Button>
+              </Box>
+            </form>
+          </Box>
+        </Fade>
+      </Modal>
+    );
+  });
+
+  CreateUserModal.displayName = 'CreateUserModal';
+
+  const EditUserModal = memo(() => {
+    const [formData, setFormData] = useState<Usuario | null>(null);
+
+    useEffect(() => {
+      if (editingUser) {
+        setFormData(editingUser);
+      }
+    }, [editingUser]);
+
+    const handleClose = useCallback(() => {
+      setShowEditModal(false);
+      setEditingUser(null);
+      setFormData(null);
+    }, []);
+
+    const handleInputChange = useCallback((field: keyof Usuario, value: string) => {
+      setFormData(prev => prev ? { ...prev, [field]: value } : null);
+    }, []);
+
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!formData) return;
+
+      try {
+        setLoadingAction(`edit-${formData.id}`);
+        const usuarioAtualizado = await usuarioService.atualizar(formData.id, formData);
+        setUsuarios(prev => prev.map(u => u.id === formData.id ? usuarioAtualizado : u));
+        handleClose();
+      } catch (err: any) {
+        console.error('Erro ao atualizar usuário:', err);
+        if (err.response?.data?.error) {
+          setError(err.response.data.error);
+        } else {
+          setError('Erro ao atualizar usuário. Verifique se todos os campos estão preenchidos corretamente.');
+        }
+      } finally {
+        setLoadingAction(null);
+      }
+    }, [formData, handleClose]);
+
+    if (!formData) return null;
+
+    return (
+      <Modal
+        aria-labelledby="transition-modal-title-edit-usuario"
+        aria-describedby="transition-modal-description-edit-usuario"
+        open={showEditModal}
+        onClose={handleClose}
+        closeAfterTransition
+        slots={{ backdrop: Backdrop }}
+        slotProps={{
+          backdrop: {
+            timeout: 500,
+          },
+        }}
+      >
+        <Fade in={showEditModal}>
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            border: '2px solid #000',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: '8px',
+          }}>
+            <Typography id="transition-modal-title-edit-usuario" variant="h6" component="h2" sx={{ mb: 2 }}>
+              Editar Usuário
+            </Typography>
+            <form onSubmit={handleSubmit}>
+              <TextField
+                label="Nome"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.nome}
+                onChange={(e) => handleInputChange('nome', e.target.value)}
+                required
+                disabled={loadingAction === `edit-${formData.id}`}
+              />
+              <TextField
+                label="Email"
+                variant="outlined"
+                fullWidth
+                type="email"
+                sx={{ mb: 2 }}
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                required
+                disabled={loadingAction === `edit-${formData.id}`}
+              />
+              <TextField
+                label="CPF"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.cpf}
+                onChange={(e) => {
+                  const cpfFormatado = formatarCPF(e.target.value);
+                  handleInputChange('cpf', cpfFormatado);
+                }}
+                required
+                disabled={loadingAction === `edit-${formData.id}`}
+                inputProps={{ maxLength: 14 }}
+              />
+              <TextField
+                label="Telefone"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.telefone}
+                onChange={(e) => {
+                  const telefoneFormatado = formatarTelefone(e.target.value);
+                  handleInputChange('telefone', telefoneFormatado);
+                }}
+                required
+                disabled={loadingAction === `edit-${formData.id}`}
+                inputProps={{ maxLength: 15 }}
+              />
+              <Select
+                label="Cargo"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={formData.cargo}
+                onChange={(e: SelectChangeEvent<"ADMIN" | "PRODUTOR">) => handleInputChange('cargo', e.target.value as 'ADMIN' | 'PRODUTOR')}
+                required
+                disabled={loadingAction === `edit-${formData.id}`}
+              >
+                <MenuItem value="PRODUTOR">PRODUTOR</MenuItem>
+                <MenuItem value="ADMIN">ADMIN</MenuItem>
+              </Select>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Button
+                  onClick={handleClose}
+                  variant="outlined"
+                  disabled={loadingAction === `edit-${formData.id}`}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={loadingAction === `edit-${formData.id}`}
+                >
+                  {loadingAction === `edit-${formData.id}` ? <CircularProgress size={24} /> : 'Salvar'}
+                </Button>
+              </Box>
+            </form>
+          </Box>
+        </Fade>
+      </Modal>
+    );
+  });
+
+  EditUserModal.displayName = 'EditUserModal';
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (changePasswordData.novaSenha !== changePasswordData.confirmarSenha) {
+      setSenhaError('As senhas não coincidem');
+      return;
+    }
+
+    const senhaValidationError = validarSenha(changePasswordData.novaSenha);
+    if (senhaValidationError) {
+      setSenhaError(senhaValidationError);
+      return;
+    }
+
+    try {
+      setLoadingAction('change-password');
+      await usuarioService.alterarSenha(changePasswordData.senhaAtual, changePasswordData.novaSenha);
+      setShowChangePasswordModal(false);
+      setChangePasswordData({
+        senhaAtual: '',
+        novaSenha: '',
+        confirmarSenha: ''
+      });
+      setSenhaError('');
+      alert('Senha alterada com sucesso!');
+    } catch (err: any) {
+      console.error('Erro ao alterar senha:', err);
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('Erro ao alterar senha. Verifique se a senha atual está correta.');
+      }
+    } finally {
+      setLoadingAction(null);
+    }
+  };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Sidebar />
+    <ThemeProvider theme={theme}>
+      <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
+        <Sidebar />
 
-      <div className="flex-1">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-            {error}
-          </div>
-        )}
-        {activeView === 'dashboard' && <DashboardView />}
-        {activeView === 'manage' && <ManageView />}
-      </div>
+        <Box sx={{ flexGrow: 1, position: 'relative', height: '100%' }}>
+          {error && (
+            <Alert
+              severity="error"
+              action={
+                <IconButton
+                  aria-label="close"
+                  color="inherit"
+                  size="small"
+                  onClick={() => {
+                    setError('');
+                  }}
+                >
+                  <XIcon fontSize="inherit" />
+                </IconButton>
+              }
+              sx={{ mb: 2 }}
+            >
+              {error}
+            </Alert>
+          )}
 
-      <CreateUserModal />
-    </div>
+          {loading && (
+            <Backdrop
+              sx={{ color: '#fff', zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
+              open={loading}
+            >
+              <CircularProgress color="inherit" />
+            </Backdrop>
+          )}
+
+          {activeView === 'dashboard' && <DashboardView />}
+          {activeView === 'manage' && <ManageView />}
+        </Box>
+
+        <CreateUserModal />
+        <EditUserModal />
+
+        {/* Modal de Alteração de Senha */}
+        <Modal
+          aria-labelledby="transition-modal-title-change-password"
+          aria-describedby="transition-modal-description-change-password"
+          open={showChangePasswordModal}
+          onClose={() => {
+            setShowChangePasswordModal(false);
+            setChangePasswordData({
+              senhaAtual: '',
+              novaSenha: '',
+              confirmarSenha: ''
+            });
+            setSenhaError('');
+          }}
+          closeAfterTransition
+          slots={{ backdrop: Backdrop }}
+          slotProps={{
+            backdrop: {
+              timeout: 500,
+            },
+          }}
+        >
+          <Fade in={showChangePasswordModal}>
+            <Box sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 400,
+              bgcolor: 'background.paper',
+              border: '2px solid #000',
+              boxShadow: 24,
+              p: 4,
+              borderRadius: '8px',
+            }}>
+              <Typography id="transition-modal-title-change-password" variant="h6" component="h2" sx={{ mb: 2 }}>
+                Alterar Senha
+              </Typography>
+              <form onSubmit={handleChangePassword}>
+                <TextField
+                  label="Senha Atual"
+                  variant="outlined"
+                  fullWidth
+                  type="password"
+                  sx={{ mb: 2 }}
+                  value={changePasswordData.senhaAtual}
+                  onChange={(e) => setChangePasswordData({ ...changePasswordData, senhaAtual: e.target.value })}
+                  required
+                  disabled={loadingAction === 'change-password'}
+                />
+                <TextField
+                  label="Nova Senha"
+                  variant="outlined"
+                  fullWidth
+                  type="password"
+                  sx={{ mb: 2 }}
+                  value={changePasswordData.novaSenha}
+                  onChange={(e) => {
+                    setChangePasswordData({ ...changePasswordData, novaSenha: e.target.value });
+                    setSenhaError(validarSenha(e.target.value));
+                  }}
+                  required
+                  disabled={loadingAction === 'change-password'}
+                  error={!!senhaError}
+                  helperText={senhaError || 'Mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial'}
+                />
+                <TextField
+                  label="Confirmar Nova Senha"
+                  variant="outlined"
+                  fullWidth
+                  type="password"
+                  sx={{ mb: 2 }}
+                  value={changePasswordData.confirmarSenha}
+                  onChange={(e) => setChangePasswordData({ ...changePasswordData, confirmarSenha: e.target.value })}
+                  required
+                  disabled={loadingAction === 'change-password'}
+                  error={changePasswordData.novaSenha !== changePasswordData.confirmarSenha}
+                  helperText={changePasswordData.novaSenha !== changePasswordData.confirmarSenha ? 'As senhas não coincidem' : ''}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                  <Button
+                    onClick={() => {
+                      setShowChangePasswordModal(false);
+                      setChangePasswordData({
+                        senhaAtual: '',
+                        novaSenha: '',
+                        confirmarSenha: ''
+                      });
+                      setSenhaError('');
+                    }}
+                    variant="outlined"
+                    disabled={loadingAction === 'change-password'}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={loadingAction === 'change-password' || !!senhaError || changePasswordData.novaSenha !== changePasswordData.confirmarSenha}
+                  >
+                    {loadingAction === 'change-password' ? <CircularProgress size={24} /> : 'Salvar'}
+                  </Button>
+                </Box>
+              </form>
+            </Box>
+          </Fade>
+        </Modal>
+      </Box>
+    </ThemeProvider>
   );
 }
