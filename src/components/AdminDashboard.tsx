@@ -1,14 +1,13 @@
 import { useEffect, useState, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Button, Paper, Grid, Table, TableContainer, TableHead, TableRow, TableCell, TableBody, TextField, Select, MenuItem, Modal, Fade, Backdrop, CircularProgress, Alert, IconButton } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import type { Theme } from '@mui/material/styles';
-import type { SxProps } from '@mui/system';
-import { People as UsersIcon, PersonAdd as UserPlusIcon, Settings as SettingsIcon, Logout as LogOutIcon, Visibility as EyeIcon, Edit as EditIcon, Delete as Trash2Icon, Save as SaveIcon, Close as XIcon, BarChart as BarChart3Icon, TrendingUp as TrendingUpIcon, Lock as LockIcon } from '@mui/icons-material';
+import { People as UsersIcon, PersonAdd as UserPlusIcon, Settings as SettingsIcon, Logout as LogOutIcon, Visibility as EyeIcon, Edit as EditIcon, Delete as Trash2Icon, Save as SaveIcon, Close as XIcon, BarChart as BarChart3Icon, TrendingUp as TrendingUpIcon, Lock as LockIcon, Brightness4 as DarkIcon, Brightness7 as LightIcon } from '@mui/icons-material';
 import { usuarioService } from '../services/api';
 import type { Usuario, NovoUsuario } from '../services/api';
 import type { SelectChangeEvent } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import { useThemeMode } from '../contexts/ThemeContext';
+import type { Theme } from '@mui/material/styles';
 
 // Funções de formatação
 const formatarCPF = (cpf: string) => {
@@ -62,6 +61,7 @@ export default function AdminDashboard() {
   const [senhaError, setSenhaError] = useState('');
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { mode, toggleTheme } = useThemeMode();
 
   useEffect(() => {
     carregarUsuarios();
@@ -184,71 +184,12 @@ export default function AdminDashboard() {
   const adminCount = usuarios.filter(u => u.cargo === 'ADMIN').length;
   const producerCount = usuarios.filter(u => u.cargo === 'PRODUTOR').length;
 
-  const theme = createTheme({
-    palette: {
-      primary: {
-        main: 'hsl(217, 72%, 46%)', // Azul principal para botões, seleção
-      },
-      secondary: {
-        main: '#9333ea', // Roxo para Produtor
-        light: '#ede9fe',
-        dark: '#7e22ce',
-      },
-      info: {
-        main: '#3b82f6', // Azul para Total de Usuários
-        light: '#dbeafe',
-        dark: '#2563eb',
-      },
-      success: {
-        main: '#22c55e', // Verde para Admin
-        light: '#dcfce7',
-        dark: '#16a34a',
-      },
-      error: {
-        main: '#ef4444', // Vermelho para erro/sair
-      },
-      background: {
-        default: '#f8fafc', // Fundo principal da dashboard (gray-100)
-        paper: '#ffffff', // Fundo de cards e modais
-      },
-      text: {
-        primary: '#1f2937', // gray-800
-        secondary: '#6b7280', // gray-500
-      },
-    },
-    components: {
-      MuiButton: {
-        styleOverrides: {
-          root: {
-            textTransform: 'none',
-          },
-        },
-      },
-      MuiPaper: {
-        styleOverrides: {
-          root: {
-            boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)', // shadow
-          },
-        },
-      },
-      MuiTableCell: {
-        styleOverrides: {
-          head: {
-            textTransform: 'uppercase',
-            fontWeight: 'medium',
-            color: 'hsl(210, 4%, 45%)', // gray-500
-          },
-        },
-      },
-    },
-  });
-
   const Sidebar = () => (
     <Box sx={{
       width: 256,
       p: 2,
-      bgcolor: 'hsl(217, 28%, 15%)',
-      color: 'white',
+      bgcolor: 'background.paper',
+      color: 'text.primary',
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -271,8 +212,9 @@ export default function AdminDashboard() {
           onClick={() => setActiveView('dashboard')}
           sx={{
             justifyContent: 'flex-start',
-            ...(activeView === 'dashboard' && { bgcolor: 'primary.main', color: 'white' }),
-            ...(! (activeView === 'dashboard') && { color: 'text.secondary', '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' } }),
+            bgcolor: activeView === 'dashboard' ? 'primary.main' : 'transparent',
+            color: activeView === 'dashboard' ? 'primary.contrastText' : 'text.secondary',
+            '&:hover': { bgcolor: activeView === 'dashboard' ? 'primary.dark' : 'action.hover' },
           }}
         >
           <BarChart3Icon sx={{ width: 20, height: 20 }} />
@@ -283,8 +225,9 @@ export default function AdminDashboard() {
           onClick={() => setActiveView('manage')}
           sx={{
             justifyContent: 'flex-start',
-            ...(activeView === 'manage' && { bgcolor: 'primary.main', color: 'white' }),
-            ...(! (activeView === 'manage') && { color: 'text.secondary', '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' } }),
+            bgcolor: activeView === 'manage' ? 'primary.main' : 'transparent',
+            color: activeView === 'manage' ? 'primary.contrastText' : 'text.secondary',
+            '&:hover': { bgcolor: activeView === 'manage' ? 'primary.dark' : 'action.hover' },
           }}
         >
           <SettingsIcon sx={{ width: 20, height: 20 }} />
@@ -295,8 +238,9 @@ export default function AdminDashboard() {
           onClick={() => setShowModal(true)}
           sx={{
             justifyContent: 'flex-start',
-            color: 'text.secondary',
-            '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+            bgcolor: showModal ? 'primary.main' : 'transparent',
+            color: showModal ? 'primary.contrastText' : 'text.secondary',
+            '&:hover': { bgcolor: showModal ? 'primary.dark' : 'action.hover' }
           }}
         >
           <UserPlusIcon sx={{ width: 20, height: 20 }} />
@@ -304,7 +248,7 @@ export default function AdminDashboard() {
         </Button>
       </Box>
 
-      <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid hsl(217, 28%, 25%)' }}>
+      <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
             <Button
               onClick={() => setShowChangePasswordModal(true)}
               sx={{
@@ -316,7 +260,7 @@ export default function AdminDashboard() {
                 borderRadius: '8px',
                 justifyContent: 'flex-start',
                 color: 'text.secondary',
-                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+                '&:hover': { bgcolor: 'action.hover' }
               }}
             >
               <LockIcon sx={{ width: 20, height: 20 }} />
@@ -334,7 +278,7 @@ export default function AdminDashboard() {
                 borderRadius: '8px',
                 justifyContent: 'flex-start',
                 color: 'error.main',
-                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+                '&:hover': { bgcolor: 'action.hover' }
               }}
             >
               <LogOutIcon sx={{ width: 20, height: 20 }} />
@@ -346,7 +290,6 @@ export default function AdminDashboard() {
 
   const DashboardView = () => (
     <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
-      <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 2 }}>Dashboard de Usuários</Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={4}>
@@ -906,156 +849,158 @@ export default function AdminDashboard() {
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
-        <Sidebar />
-
-        <Box sx={{ flexGrow: 1, position: 'relative', height: '100%' }}>
-          {error && (
-            <Alert
-              severity="error"
-              action={
-                <IconButton
-                  aria-label="close"
-                  color="inherit"
-                  size="small"
-                  onClick={() => {
-                    setError('');
-                  }}
-                >
-                  <XIcon fontSize="inherit" />
-                </IconButton>
-              }
-              sx={{ mb: 2 }}
-            >
-              {error}
-            </Alert>
-          )}
-
-          {loading && (
-            <Backdrop
-              sx={{ color: '#fff', zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
-              open={loading}
-            >
-              <CircularProgress color="inherit" />
-            </Backdrop>
-          )}
-
-          {activeView === 'dashboard' && <DashboardView />}
-          {activeView === 'manage' && <ManageView />}
+    <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
+      <Sidebar />
+      <Box sx={{ flexGrow: 1, p: 4, overflow: 'auto' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 2 }}>
+          <IconButton onClick={toggleTheme} color="primary" aria-label="Alternar tema" sx={{ mr: 2 }}>
+            {mode === 'dark' ? <LightIcon sx={{ color: 'text.primary' }} /> : <DarkIcon sx={{ color: 'text.primary' }} />}
+          </IconButton>
         </Box>
+        {error && (
+          <Alert
+            severity="error"
+            action={
+              <IconButton
+                aria-label="close"
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  setError('');
+                }}
+              >
+                <XIcon fontSize="inherit" />
+              </IconButton>
+            }
+            sx={{ mb: 2 }}
+          >
+            {error}
+          </Alert>
+        )}
 
-        <CreateUserModal />
-        <EditUserModal />
+        {loading && (
+          <Backdrop
+            sx={{ color: '#fff', zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
+            open={loading}
+          >
+            <CircularProgress color="inherit" />
+          </Backdrop>
+        )}
 
-        {/* Modal de Alteração de Senha */}
-        <Modal
-          aria-labelledby="transition-modal-title-change-password"
-          aria-describedby="transition-modal-description-change-password"
-          open={showChangePasswordModal}
-          onClose={() => {
-            setShowChangePasswordModal(false);
-            setChangePasswordData({
-              senhaAtual: '',
-              novaSenha: '',
-              confirmarSenha: ''
-            });
-            setSenhaError('');
-          }}
-          closeAfterTransition
-          slots={{ backdrop: Backdrop }}
-          slotProps={{
-            backdrop: {
-              timeout: 500,
-            },
-          }}
-        >
-          <Fade in={showChangePasswordModal}>
-            <Box sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 400,
-              bgcolor: 'background.paper',
-              border: '2px solid #000',
-              boxShadow: 24,
-              p: 4,
-              borderRadius: '8px',
-            }}>
-              <Typography id="transition-modal-title-change-password" variant="h6" component="h2" sx={{ mb: 2 }}>
-                Alterar Senha
-              </Typography>
-              <form onSubmit={handleChangePassword}>
-                <TextField
-                  label="Senha Atual"
-                  variant="outlined"
-                  fullWidth
-                  type="password"
-                  sx={{ mb: 2 }}
-                  value={changePasswordData.senhaAtual}
-                  onChange={(e) => setChangePasswordData({ ...changePasswordData, senhaAtual: e.target.value })}
-                  required
-                  disabled={loadingAction === 'change-password'}
-                />
-                <TextField
-                  label="Nova Senha"
-                  variant="outlined"
-                  fullWidth
-                  type="password"
-                  sx={{ mb: 2 }}
-                  value={changePasswordData.novaSenha}
-                  onChange={(e) => {
-                    setChangePasswordData({ ...changePasswordData, novaSenha: e.target.value });
-                    setSenhaError(validarSenha(e.target.value));
-                  }}
-                  required
-                  disabled={loadingAction === 'change-password'}
-                  error={!!senhaError}
-                  helperText={senhaError || 'Mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial'}
-                />
-                <TextField
-                  label="Confirmar Nova Senha"
-                  variant="outlined"
-                  fullWidth
-                  type="password"
-                  sx={{ mb: 2 }}
-                  value={changePasswordData.confirmarSenha}
-                  onChange={(e) => setChangePasswordData({ ...changePasswordData, confirmarSenha: e.target.value })}
-                  required
-                  disabled={loadingAction === 'change-password'}
-                  error={changePasswordData.novaSenha !== changePasswordData.confirmarSenha}
-                  helperText={changePasswordData.novaSenha !== changePasswordData.confirmarSenha ? 'As senhas não coincidem' : ''}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  <Button
-                    onClick={() => {
-                      setShowChangePasswordModal(false);
-                      setChangePasswordData({
-                        senhaAtual: '',
-                        novaSenha: '',
-                        confirmarSenha: ''
-                      });
-                      setSenhaError('');
-                    }}
-                    variant="outlined"
-                    disabled={loadingAction === 'change-password'}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={loadingAction === 'change-password' || !!senhaError || changePasswordData.novaSenha !== changePasswordData.confirmarSenha}
-                  >
-                    {loadingAction === 'change-password' ? <CircularProgress size={24} /> : 'Salvar'}
-                  </Button>
-                </Box>
-              </form>
-            </Box>
-          </Fade>
-        </Modal>
+        {activeView === 'dashboard' && <DashboardView />}
+        {activeView === 'manage' && <ManageView />}
       </Box>
-    </ThemeProvider>
+
+      <CreateUserModal />
+      <EditUserModal />
+
+      {/* Modal de Alteração de Senha */}
+      <Modal
+        aria-labelledby="transition-modal-title-change-password"
+        aria-describedby="transition-modal-description-change-password"
+        open={showChangePasswordModal}
+        onClose={() => {
+          setShowChangePasswordModal(false);
+          setChangePasswordData({
+            senhaAtual: '',
+            novaSenha: '',
+            confirmarSenha: ''
+          });
+          setSenhaError('');
+        }}
+        closeAfterTransition
+        slots={{ backdrop: Backdrop }}
+        slotProps={{
+          backdrop: {
+            timeout: 500,
+          },
+        }}
+      >
+        <Fade in={showChangePasswordModal}>
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 400,
+            bgcolor: 'background.paper',
+            border: '2px solid #000',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: '8px',
+          }}>
+            <Typography id="transition-modal-title-change-password" variant="h6" component="h2" sx={{ mb: 2 }}>
+              Alterar Senha
+            </Typography>
+            <form onSubmit={handleChangePassword}>
+              <TextField
+                label="Senha Atual"
+                variant="outlined"
+                fullWidth
+                type="password"
+                sx={{ mb: 2 }}
+                value={changePasswordData.senhaAtual}
+                onChange={(e) => setChangePasswordData({ ...changePasswordData, senhaAtual: e.target.value })}
+                required
+                disabled={loadingAction === 'change-password'}
+              />
+              <TextField
+                label="Nova Senha"
+                variant="outlined"
+                fullWidth
+                type="password"
+                sx={{ mb: 2 }}
+                value={changePasswordData.novaSenha}
+                onChange={(e) => {
+                  setChangePasswordData({ ...changePasswordData, novaSenha: e.target.value });
+                  setSenhaError(validarSenha(e.target.value));
+                }}
+                required
+                disabled={loadingAction === 'change-password'}
+                error={!!senhaError}
+                helperText={senhaError || 'Mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial'}
+              />
+              <TextField
+                label="Confirmar Nova Senha"
+                variant="outlined"
+                fullWidth
+                type="password"
+                sx={{ mb: 2 }}
+                value={changePasswordData.confirmarSenha}
+                onChange={(e) => setChangePasswordData({ ...changePasswordData, confirmarSenha: e.target.value })}
+                required
+                disabled={loadingAction === 'change-password'}
+                error={changePasswordData.novaSenha !== changePasswordData.confirmarSenha}
+                helperText={changePasswordData.novaSenha !== changePasswordData.confirmarSenha ? 'As senhas não coincidem' : ''}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Button
+                  onClick={() => {
+                    setShowChangePasswordModal(false);
+                    setChangePasswordData({
+                      senhaAtual: '',
+                      novaSenha: '',
+                      confirmarSenha: ''
+                    });
+                    setSenhaError('');
+                  }}
+                  variant="outlined"
+                  disabled={loadingAction === 'change-password'}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={loadingAction === 'change-password' || !!senhaError || changePasswordData.novaSenha !== changePasswordData.confirmarSenha}
+                >
+                  {loadingAction === 'change-password' ? <CircularProgress size={24} /> : 'Salvar'}
+                </Button>
+              </Box>
+            </form>
+          </Box>
+        </Fade>
+      </Modal>
+    </Box>
   );
 }

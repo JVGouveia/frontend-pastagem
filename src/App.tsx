@@ -4,6 +4,8 @@ import AdminDashboard from './components/AdminDashboard';
 import { ProdutorDashboard } from './components/ProdutorDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Cargo } from './contexts/AuthContext';
+import NDVICreateMap from './components/NDVICreateMap';
+import { ThemeProviderCustom } from './contexts/ThemeContext';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -28,6 +30,10 @@ function AppRoutes() {
           )
         }
       />
+      <Route
+        path="/propriedade/:id/novo-mapa"
+        element={user ? <NDVICreateMap /> : <Navigate to="/login" replace />}
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -37,7 +43,9 @@ export function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <ThemeProviderCustom>
+          <AppRoutes />
+        </ThemeProviderCustom>
       </AuthProvider>
     </Router>
   );

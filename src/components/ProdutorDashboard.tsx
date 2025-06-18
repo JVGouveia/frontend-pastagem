@@ -22,7 +22,6 @@ import {
   Collapse,
   TableSortLabel 
 } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { 
   Logout as LogOutIcon, 
   Add as AddIcon, 
@@ -34,12 +33,15 @@ import {
   KeyboardArrowUp as ExpandLessIcon,
   Lock as LockIcon,
   Dashboard as DashboardIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Brightness4 as DarkIcon,
+  Brightness7 as LightIcon
 } from '@mui/icons-material';
 import api from '../config/axios';
 import { useAuth } from '../contexts/AuthContext';
 import React from 'react';
 import ImageViewer from './ImageViewer';
+import { useThemeMode } from '../contexts/ThemeContext';
 
 interface Propriedade {
   id: number;
@@ -86,65 +88,6 @@ const pastagemHeadCells = [
   { id: 'capacidadeSuporte', label: 'Capacidade de Suporte', numeric: true },
 ];
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: 'hsl(217, 72%, 46%)',
-    },
-    secondary: {
-      main: '#9333ea',
-      light: '#ede9fe',
-      dark: '#7e22ce',
-    },
-    info: {
-      main: '#3b82f6',
-      light: '#dbeafe',
-      dark: '#2563eb',
-    },
-    success: {
-      main: '#22c55e',
-      light: '#dcfce7',
-      dark: '#16a34a',
-    },
-    error: {
-      main: '#ef4444',
-    },
-    background: {
-      default: '#f8fafc',
-      paper: '#ffffff',
-    },
-    text: {
-      primary: '#1f2937',
-      secondary: '#6b7280',
-    },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        },
-      },
-    },
-    MuiTableCell: {
-      styleOverrides: {
-        head: {
-          textTransform: 'uppercase',
-          fontWeight: 'medium',
-          color: 'hsl(210, 4%, 45%)',
-        },
-      },
-    },
-  },
-});
-
 export function ProdutorDashboard() {
   const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [pastagens, setPastagens] = useState<Pastagem[]>([]);
@@ -187,6 +130,7 @@ export function ProdutorDashboard() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'ndvi'>('dashboard');
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { mode, toggleTheme } = useThemeMode();
 
   useEffect(() => {
     carregarDados();
@@ -526,362 +470,375 @@ export function ProdutorDashboard() {
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
-        {/* Sidebar */}
-        <Box sx={{
-          width: 256,
-          p: 2,
-          bgcolor: 'hsl(217, 28%, 15%)',
-          color: 'white',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold' }}>Dashboard do Produtor</Typography>
+    <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
+      {/* Sidebar */}
+      <Box sx={{
+        width: 256,
+        p: 2,
+        bgcolor: 'background.paper',
+        color: 'text.primary',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold' }}>Dashboard do Produtor</Typography>
+          </Box>
+          {user && (
+            <Box sx={{ fontSize: 12, color: 'text.secondary' }}>
+              <Typography variant="body2">Logado como:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{user.nome}</Typography>
+              <Typography variant="body2" sx={{ color: 'info.main' }}>{user.cargo}</Typography>
             </Box>
-            {user && (
-              <Box sx={{ fontSize: 12, color: 'text.secondary' }}>
-                <Typography variant="body2">Logado como:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{user.nome}</Typography>
-                <Typography variant="body2" sx={{ color: 'info.main' }}>{user.cargo}</Typography>
-              </Box>
-            )}
-          </Box>
-
-          {/* Navigation Buttons */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Button
-              onClick={() => setCurrentView('dashboard')}
-              sx={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                p: 1.5,
-                borderRadius: '8px',
-                justifyContent: 'flex-start',
-                color: currentView === 'dashboard' ? 'white' : 'text.secondary',
-                bgcolor: currentView === 'dashboard' ? 'hsl(217, 28%, 20%)' : 'transparent',
-                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
-              }}
-            >
-              <DashboardIcon sx={{ width: 20, height: 20 }} />
-              Dashboard
-            </Button>
-
-            <Button
-              onClick={() => setCurrentView('ndvi')}
-              sx={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                p: 1.5,
-                borderRadius: '8px',
-                justifyContent: 'flex-start',
-                color: currentView === 'ndvi' ? 'white' : 'text.secondary',
-                bgcolor: currentView === 'ndvi' ? 'hsl(217, 28%, 20%)' : 'transparent',
-                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
-              }}
-            >
-              <ImageIcon sx={{ width: 20, height: 20 }} />
-              Visualizar NDVI
-            </Button>
-          </Box>
-
-          <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid hsl(217, 28%, 25%)' }}>
-            <Button
-              onClick={() => setShowChangePasswordModal(true)}
-              sx={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                p: 1.5,
-                borderRadius: '8px',
-                justifyContent: 'flex-start',
-                color: 'text.secondary',
-                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
-              }}
-            >
-              <LockIcon sx={{ width: 20, height: 20 }} />
-              Alterar Senha
-            </Button>
-
-            <Button
-              onClick={handleLogout}
-              sx={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                p: 1.5,
-                borderRadius: '8px',
-                justifyContent: 'flex-start',
-                color: 'error.main',
-                '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
-              }}
-            >
-              <LogOutIcon sx={{ width: 20, height: 20 }} />
-              Sair
-            </Button>
-          </Box>
+          )}
         </Box>
 
-        {/* Main Content */}
-        <Box sx={{ flexGrow: 1, p: 4, overflow: 'auto' }}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+        {/* Navigation Buttons */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Button
+            onClick={() => setCurrentView('dashboard')}
+            sx={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              p: 1.5,
+              borderRadius: '8px',
+              justifyContent: 'flex-start',
+              color: currentView === 'dashboard' ? 'white' : 'text.secondary',
+              bgcolor: currentView === 'dashboard' ? 'hsl(217, 28%, 20%)' : 'transparent',
+              '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+            }}
+          >
+            <DashboardIcon sx={{ width: 20, height: 20 }} />
+            Dashboard
+          </Button>
 
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              {currentView === 'dashboard' ? (
-                <>
-                  {/* Dashboard Cards */}
-                  <Grid container spacing={3} sx={{ mb: 4 }}>
-                    <Grid item xs={12} md={4}>
-                      <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'info.main' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Total de Propriedades</Typography>
-                            <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{totalPropriedades}</Typography>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    </Grid>
+          <Button
+            onClick={() => setCurrentView('ndvi')}
+            sx={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              p: 1.5,
+              borderRadius: '8px',
+              justifyContent: 'flex-start',
+              color: currentView === 'ndvi' ? 'white' : 'text.secondary',
+              bgcolor: currentView === 'ndvi' ? 'hsl(217, 28%, 20%)' : 'transparent',
+              '&:hover': { bgcolor: 'hsl(217, 28%, 20%)' }
+            }}
+          >
+            <ImageIcon sx={{ width: 20, height: 20 }} />
+            Visualizar NDVI
+          </Button>
+        </Box>
 
-                    <Grid item xs={12} md={4}>
-                      <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'success.main' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Total de Pastagens</Typography>
-                            <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{totalPastagens}</Typography>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    </Grid>
+        <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button
+            onClick={() => setShowChangePasswordModal(true)}
+            sx={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              p: 1.5,
+              borderRadius: '8px',
+              justifyContent: 'flex-start',
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'action.hover' }
+            }}
+          >
+            <LockIcon sx={{ width: 20, height: 20 }} />
+            Alterar Senha
+          </Button>
 
-                    <Grid item xs={12} md={4}>
-                      <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'secondary.main' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Área Total</Typography>
-                            <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{areaTotal} ha</Typography>
-                          </Box>
+          <Button
+            onClick={handleLogout}
+            sx={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              p: 1.5,
+              borderRadius: '8px',
+              justifyContent: 'flex-start',
+              color: 'error.main',
+              '&:hover': { bgcolor: 'action.hover' }
+            }}
+          >
+            <LogOutIcon sx={{ width: 20, height: 20 }} />
+            Sair
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Main Content */}
+      <Box sx={{ flexGrow: 1, p: 4, overflow: 'auto' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', p: 2 }}>
+          <IconButton onClick={toggleTheme} color="primary" aria-label="Alternar tema" sx={{ mr: 2 }}>
+            {mode === 'dark' ? <LightIcon sx={{ color: 'text.primary' }} /> : <DarkIcon sx={{ color: 'text.primary' }} />}
+          </IconButton>
+        </Box>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {currentView === 'dashboard' ? (
+              <>
+                {/* Dashboard Cards */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                  <Grid item xs={12} md={4}>
+                    <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'info.main' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography variant="body2" color="text.secondary">Total de Propriedades</Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{totalPropriedades}</Typography>
                         </Box>
-                      </Paper>
-                    </Grid>
+                      </Box>
+                    </Paper>
                   </Grid>
 
-                  {/* Pastagens Table */}
-                  <Paper elevation={1} sx={{ mt: 4, borderRadius: '8px', overflow: 'hidden' }}>
-                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="h6" component="h2">Propriedades</Typography>
-                      <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => setShowModal(true)}
-                      >
-                        Nova Propriedade
-                      </Button>
-                    </Box>
-                    <TableContainer>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell width="50px"></TableCell>
-                            {headCells.map((headCell) => (
-                              <TableCell
-                                key={headCell.id}
-                                align={headCell.numeric ? 'right' : 'left'}
-                                sortDirection={orderBy === headCell.id ? order : false}
+                  <Grid item xs={12} md={4}>
+                    <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'success.main' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography variant="body2" color="text.secondary">Total de Pastagens</Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{totalPastagens}</Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <Paper elevation={1} sx={{ p: 3, borderRadius: '8px', borderLeft: '4px solid', borderColor: 'secondary.main' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography variant="body2" color="text.secondary">Área Total</Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{areaTotal} ha</Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Pastagens Table */}
+                <Paper elevation={1} sx={{ mt: 4, borderRadius: '8px', overflow: 'hidden' }}>
+                  <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" component="h2">Propriedades</Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => setShowModal(true)}
+                    >
+                      Nova Propriedade
+                    </Button>
+                  </Box>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell width="50px"></TableCell>
+                          {headCells.map((headCell) => (
+                            <TableCell
+                              key={headCell.id}
+                              align={headCell.numeric ? 'right' : 'left'}
+                              sortDirection={orderBy === headCell.id ? order : false}
+                            >
+                              <TableSortLabel
+                                active={orderBy === headCell.id}
+                                direction={orderBy === headCell.id ? order : 'asc'}
+                                onClick={() => handleRequestSort(headCell.id)}
                               >
-                                <TableSortLabel
-                                  active={orderBy === headCell.id}
-                                  direction={orderBy === headCell.id ? order : 'asc'}
-                                  onClick={() => handleRequestSort(headCell.id)}
-                                >
-                                  {headCell.label}
-                                </TableSortLabel>
-                              </TableCell>
-                            ))}
-                            <TableCell>Ações</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {sortedPropriedades.map((propriedade) => (
-                            <React.Fragment key={propriedade.id}>
-                              <TableRow 
-                                hover 
-                                onClick={() => {
-                                  console.log('ID da propriedade expandida:', propriedade.id);
-                                  togglePropriedade(propriedade.id);
-                                }}
-                                sx={{ cursor: 'pointer' }}
-                              >
-                                <TableCell>
-                                  <IconButton size="small">
-                                    {expandedPropriedades.includes(propriedade.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                                  </IconButton>
-                                </TableCell>
-                                <TableCell>
-                                  <Typography variant="body2">{propriedade.nome}</Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Typography variant="body2" color="text.secondary">{propriedade.endereco}</Typography>
-                                </TableCell>
-                                <TableCell align="right">
-                                  <Typography variant="body2" color="text.secondary">{propriedade.areaTotal} ha</Typography>
-                                </TableCell>
-                                <TableCell align="right">
-                                  <Typography variant="body2" color="text.secondary">{propriedade.pastagens.length}</Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditandoPropriedade(propriedade);
-                                        setShowEditPropriedadeModal(true);
-                                      }}
-                                      color="info"
-                                    >
-                                      <EditIcon sx={{ width: 16, height: 16 }} />
-                                    </IconButton>
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePropriedade(propriedade.id);
-                                      }}
-                                      color="error"
-                                    >
-                                      <Trash2Icon sx={{ width: 16, height: 16 }} />
-                                    </IconButton>
-                                  </Box>
-                                </TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
-                                  <Collapse in={expandedPropriedades.includes(propriedade.id)} timeout="auto" unmountOnExit>
-                                    <Box sx={{ margin: 1 }}>
-                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                        <Typography variant="h6" component="h3">Pastagens da Propriedade</Typography>
-                                        <Button
-                                          variant="contained"
-                                          size="small"
-                                          startIcon={<AddIcon />}
-                                          onClick={() => {
-                                            setSelectedPropriedadeIdForPastagem(propriedade.id);
-                                            setShowNewPastagemModal(true);
-                                          }}
-                                        >
-                                          Adicionar Pastagem
-                                        </Button>
-                                      </Box>
-                                      <Table size="small">
-                                        <TableHead>
-                                          <TableRow>
-                                            {pastagemHeadCells.map((headCell) => (
-                                              <TableCell
-                                                key={headCell.id}
-                                                align={headCell.numeric ? 'right' : 'left'}
-                                                sortDirection={pastagemOrderBy[propriedade.id] === headCell.id ? pastagemOrder[propriedade.id] || 'asc' : false}
-                                              >
-                                                <TableSortLabel
-                                                  active={pastagemOrderBy[propriedade.id] === headCell.id}
-                                                  direction={pastagemOrderBy[propriedade.id] === headCell.id ? pastagemOrder[propriedade.id] || 'asc' : 'asc'}
-                                                  onClick={() => handlePastagemRequestSort(propriedade.id, headCell.id)}
-                                                >
-                                                  {headCell.label}
-                                                </TableSortLabel>
-                                              </TableCell>
-                                            ))}
-                                            <TableCell>Ações</TableCell>
-                                          </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                          {getSortedPastagens(propriedade).map((pastagem) => (
-                                            <TableRow key={pastagem.id}>
-                                              <TableCell align="left">{pastagem.nome}</TableCell>
-                                              <TableCell align="right">{pastagem.areaHectares} ha</TableCell>
-                                              <TableCell align="left">{pastagem.tipoPasto}</TableCell>
-                                              <TableCell align="right">{pastagem.capacidadeSuporte}</TableCell>
-                                              <TableCell>
-                                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                                  <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      const propriedadeAtual = propriedadesComPastagens.find(p => 
-                                                        p.pastagens.some(pastagem => pastagem.id === pastagem.id)
-                                                      );
-                                                      if (propriedadeAtual) {
-                                                        setEditandoPastagem({
-                                                          ...pastagem,
-                                                          propriedade: propriedadeAtual.id
-                                                        });
-                                                        setShowEditPastagemModal(true);
-                                                      } else {
-                                                        setError('Propriedade não encontrada para esta pastagem');
-                                                      }
-                                                    }}
-                                                    color="info"
-                                                  >
-                                                    <EditIcon sx={{ width: 16, height: 16 }} />
-                                                  </IconButton>
-                                                  <IconButton
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleDeletePastagem(pastagem.id);
-                                                    }}
-                                                    color="error"
-                                                  >
-                                                    <Trash2Icon sx={{ width: 16, height: 16 }} />
-                                                  </IconButton>
-                                                </Box>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                          {propriedade.pastagens.length === 0 && (
-                                            <TableRow>
-                                              <TableCell colSpan={5} align="center">
-                                                <Typography variant="body2" color="text.secondary">
-                                                  Nenhuma pastagem cadastrada
-                                                </Typography>
-                                              </TableCell>
-                                            </TableRow>
-                                          )}
-                                        </TableBody>
-                                      </Table>
-                                    </Box>
-                                  </Collapse>
-                                </TableCell>
-                              </TableRow>
-                            </React.Fragment>
+                                {headCell.label}
+                              </TableSortLabel>
+                            </TableCell>
                           ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Paper>
-                </>
-              ) : (
-                <ImageViewer />
-              )}
-            </>
-          )}
-        </Box>
+                          <TableCell>Ações</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {sortedPropriedades.map((propriedade) => (
+                          <React.Fragment key={propriedade.id}>
+                            <TableRow 
+                              hover 
+                              onClick={() => {
+                                console.log('ID da propriedade expandida:', propriedade.id);
+                                togglePropriedade(propriedade.id);
+                              }}
+                              sx={{ cursor: 'pointer' }}
+                            >
+                              <TableCell>
+                                <IconButton size="small">
+                                  {expandedPropriedades.includes(propriedade.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                </IconButton>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">{propriedade.nome}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" color="text.secondary">{propriedade.endereco}</Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography variant="body2" color="text.secondary">{propriedade.areaTotal} ha</Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography variant="body2" color="text.secondary">{propriedade.pastagens.length}</Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditandoPropriedade(propriedade);
+                                      setShowEditPropriedadeModal(true);
+                                    }}
+                                    color="info"
+                                  >
+                                    <EditIcon sx={{ width: 16, height: 16 }} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePropriedade(propriedade.id);
+                                    }}
+                                    color="error"
+                                  >
+                                    <Trash2Icon sx={{ width: 16, height: 16 }} />
+                                  </IconButton>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/propriedade/${propriedade.id}/novo-mapa`);
+                                    }}
+                                  >
+                                    Adicionar Mapa NDVI
+                                  </Button>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+                                <Collapse in={expandedPropriedades.includes(propriedade.id)} timeout="auto" unmountOnExit>
+                                  <Box sx={{ margin: 1 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                      <Typography variant="h6" component="h3">Pastagens da Propriedade</Typography>
+                                      <Button
+                                        variant="contained"
+                                        size="small"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => {
+                                          setSelectedPropriedadeIdForPastagem(propriedade.id);
+                                          setShowNewPastagemModal(true);
+                                        }}
+                                      >
+                                        Adicionar Pastagem
+                                      </Button>
+                                    </Box>
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          {pastagemHeadCells.map((headCell) => (
+                                            <TableCell
+                                              key={headCell.id}
+                                              align={headCell.numeric ? 'right' : 'left'}
+                                              sortDirection={pastagemOrderBy[propriedade.id] === headCell.id ? pastagemOrder[propriedade.id] || 'asc' : false}
+                                            >
+                                              <TableSortLabel
+                                                active={pastagemOrderBy[propriedade.id] === headCell.id}
+                                                direction={pastagemOrderBy[propriedade.id] === headCell.id ? pastagemOrder[propriedade.id] || 'asc' : 'asc'}
+                                                onClick={() => handlePastagemRequestSort(propriedade.id, headCell.id)}
+                                              >
+                                                {headCell.label}
+                                              </TableSortLabel>
+                                            </TableCell>
+                                          ))}
+                                          <TableCell>Ações</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {getSortedPastagens(propriedade).map((pastagem) => (
+                                          <TableRow key={pastagem.id}>
+                                            <TableCell align="left">{pastagem.nome}</TableCell>
+                                            <TableCell align="right">{pastagem.areaHectares} ha</TableCell>
+                                            <TableCell align="left">{pastagem.tipoPasto}</TableCell>
+                                            <TableCell align="right">{pastagem.capacidadeSuporte}</TableCell>
+                                            <TableCell>
+                                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const propriedadeAtual = propriedadesComPastagens.find(p => 
+                                                      p.pastagens.some(pastagem => pastagem.id === pastagem.id)
+                                                    );
+                                                    if (propriedadeAtual) {
+                                                      setEditandoPastagem({
+                                                        ...pastagem,
+                                                        propriedade: propriedadeAtual.id
+                                                      });
+                                                      setShowEditPastagemModal(true);
+                                                    } else {
+                                                      setError('Propriedade não encontrada para esta pastagem');
+                                                    }
+                                                  }}
+                                                  color="info"
+                                                >
+                                                  <EditIcon sx={{ width: 16, height: 16 }} />
+                                                </IconButton>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeletePastagem(pastagem.id);
+                                                  }}
+                                                  color="error"
+                                                >
+                                                  <Trash2Icon sx={{ width: 16, height: 16 }} />
+                                                </IconButton>
+                                              </Box>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                        {propriedade.pastagens.length === 0 && (
+                                          <TableRow>
+                                            <TableCell colSpan={5} align="center">
+                                              <Typography variant="body2" color="text.secondary">
+                                                Nenhuma pastagem cadastrada
+                                              </Typography>
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </TableBody>
+                                    </Table>
+                                  </Box>
+                                </Collapse>
+                              </TableCell>
+                            </TableRow>
+                          </React.Fragment>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </>
+            ) : (
+              <ImageViewer propriedades={propriedades} />
+            )}
+          </>
+        )}
       </Box>
 
       {/* Modal para Adicionar Nova Pastagem */}
@@ -1368,6 +1325,6 @@ export function ProdutorDashboard() {
         </Fade>
       </Modal>
 
-    </ThemeProvider>
+    </Box>
   );
 }
