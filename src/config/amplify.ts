@@ -17,7 +17,7 @@ const config: ResourcesConfig = {
   API: {
     REST: {
       api: {
-        endpoint: 'http://localhost:8080',
+        endpoint: 'http://192.168.56.103:8080',
         region: 'sa-east-1'
       }
     }

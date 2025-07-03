@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { config } from './environment';
 
 const api = axios.create({
-  baseURL: '/api', // Usando o proxy do Vite ou ajuste conforme necessário
+  baseURL: config.getApiURL(),
   headers: {
     'Content-Type': 'application/json',
   },
