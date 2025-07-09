@@ -6,7 +6,7 @@ export const config = {
   
   // URLs da API
   apiBaseURL: import.meta.env.VITE_API_BASE_URL || 'http://192.168.56.103:3001',
-  graphqlURL: import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:3000',
+  graphqlURL: import.meta.env.VITE_GRAPHQL_URL || 'http://192.168.56.103:3000',
   
   // Para desenvolvimento local, usa proxy
   useProxy: import.meta.env.DEV && !import.meta.env.VITE_USE_DIRECT_API,
