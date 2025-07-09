@@ -44,6 +44,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { graphqlClient } from '../config/graphqlClient';
 
 interface ImageMetadata {
   coordinates: {
@@ -228,59 +229,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ propriedades = [] }) => {
   };
 
   const makeGraphQLRequest = async (query: string, variables = {}) => {
-    const requestBody = {
-      query: query.trim(),
-      variables: {
+    try {
+      return await graphqlClient.request(query, {
         ...variables,
         propriedadeId: queryParams.propriedadeId
-      }
-    };
-
-    // Garantir que a URL do GraphQL seja relativa
-    const graphqlEndpoint = graphqlUrl.startsWith('http') ? '/graphql' : graphqlUrl;
-
-    setDebugInfo({
-      url: graphqlEndpoint,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: requestBody,
-      timestamp: new Date().toISOString()
-    });
-
-    try {
-      const response = await fetch(graphqlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        credentials: 'include',
-        body: JSON.stringify(requestBody)
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erro HTTP ${response.status}: ${response.statusText}\nDetalhes: ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-        throw new Error(`Erro ao fazer parse da resposta JSON: ${errorMessage}\nResposta: ${responseText}`);
-      }
-      
-      if (result.errors) {
-        throw new Error(`Erro GraphQL: ${result.errors.map((e: any) => e.message).join(', ')}`);
-      }
-
-      return result.data;
     } catch (error) {
       console.error('Erro na requisição GraphQL:', error);
       throw error;
@@ -498,26 +451,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ propriedades = [] }) => {
           deleteNDVIMap(id: $id)
         }
       `;
-      const requestBody = {
-        query: mutation,
-        variables: { id }
-      };
-      const graphqlEndpoint = graphqlUrl.startsWith('http') ? '/graphql' : graphqlUrl;
-      const response = await fetch(graphqlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        credentials: 'include',
-        body: JSON.stringify(requestBody)
-      });
-      const result = await response.json();
-      if (result.errors) {
-        throw new Error(result.errors.map((e: any) => e.message).join(', '));
-      }
-      if (result.data.deleteNDVIMap) {
+      
+      const result = await graphqlClient.request(mutation, { id });
+      
+      if (result.deleteNDVIMap) {
         setImages(prev => prev.filter(img => img.id !== id));
         setTotalCount(prev => prev - 1);
       } else {
@@ -619,22 +556,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ propriedades = [] }) => {
         },
         propriedadeId: mapToEdit.propriedadeId
       };
-      const graphqlEndpoint = graphqlUrl.startsWith('http') ? '/graphql' : graphqlUrl;
-      const response = await fetch(graphqlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        credentials: 'include',
-        body: JSON.stringify({ query: mutation, variables })
-      });
-      const result = await response.json();
-      if (result.errors) {
-        throw new Error(result.errors.map((e: any) => e.message).join(', '));
-      }
-      const updated = result.data.updateNDVIMap;
+      
+      const result = await graphqlClient.request(mutation, variables);
+      const updated = result.updateNDVIMap;
       setImages(prev => prev.map(img => img.id === updated.id ? {
         ...img,
         ...updated,
