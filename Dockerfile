@@ -1,43 +1,67 @@
-# Use a imagem oficial do Node.js baseada em Alpine (mais leve)
-FROM node:18-alpine
+# Use a imagem oficial do Node.js
+FROM node:18-alpine AS builder
 
-# Define o diretÛrio de trabalho dentro do container
+# Instala depend√™ncias do sistema
+RUN apk add --no-cache python3 make g++
+
+# Define o diret√≥rio de trabalho
 WORKDIR /app
 
-# Instala dependÍncias do sistema necess·rias para algumas bibliotecas Node.js
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    && ln -sf python3 /usr/bin/python
-
-# Copia apenas os arquivos de dependÍncias primeiro (para cache do Docker)
+# Copia arquivos de depend√™ncias
 COPY package*.json ./
 
-# Instala as dependÍncias
-RUN npm ci && npm cache clean --force
+# Instala depend√™ncias
+RUN npm ci
 
-# Copia o resto do cÛdigo da aplicaÁ„o
+# Copia o c√≥digo da aplica√ß√£o
 COPY . .
-# Garante permissıes corretas para todos os arquivos
-RUN chmod -R +x /app
 
-# Cria um usu·rio n„o-root para seguranÁa
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
+# Corrige permiss√µes dos bin√°rios
+RUN chmod -R +x node_modules/.bin/
 
-# Define as permissıes corretas
-RUN chown -R nextjs:nodejs /app
-USER nextjs
-
+# Faz o build da aplica√ß√£o
 RUN npm run build
 
-# Expıe a porta que a aplicaÁ„o ir· usar
-EXPOSE 3000
+# ========================================
+# Est√°gio de produ√ß√£o com Nginx
+# ========================================
+FROM nginx:alpine
 
-# Define vari·veis de ambiente
-ENV NODE_ENV=production
-ENV PORT=3000
+# Copia os arquivos buildados do Vite para o Nginx
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Comando para iniciar a aplicaÁ„o
-CMD ["npm", "start"]
+# Cria configura√ß√£o customizada do Nginx para SPA
+RUN echo 'server { \
+    listen 5173; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    \
+    # Configura√ß√£o para SPA (Single Page Application) \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+    \
+    # Cache para assets est√°ticos \
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { \
+        expires 1y; \
+        add_header Cache-Control "public, immutable"; \
+    } \
+    \
+    # Headers de seguran√ßa \
+    add_header X-Frame-Options "SAMEORIGIN" always; \
+    add_header X-Content-Type-Options "nosniff" always; \
+    add_header X-XSS-Protection "1; mode=block" always; \
+    \
+    # Compress√£o gzip \
+    gzip on; \
+    gzip_vary on; \
+    gzip_min_length 1024; \
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json; \
+}' > /etc/nginx/conf.d/default.conf
+
+# Exp√µe a porta 5173
+EXPOSE 5173
+
+# Comando para iniciar o Nginx
+CMD ["nginx", "-g", "daemon off;"]
